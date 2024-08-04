@@ -227,4 +227,41 @@ def min_enclosing_face_circle(landmark_point):
         ]
         landmark_array = np.append(landmark_array, np_landmark_point, axis=0)
 
-    center, radius = cv.minEnclosingCircle(
+    center, radius = cv.minEnclosingCircle(points=landmark_array)
+
+    return center, radius
+
+def draw_stick(
+        image,
+        point01,
+        point01_radius,
+        point02,
+        point02_radius,
+        color=(100, 33, 3),
+        bg_color=(255, 255, 255),
+):
+    cv.circle(image, point01, point01_radius, color, -1)
+    cv.circle(image, point02, point02_radius, color, -1)
+
+    draw_list = []
+    for index in range(2):
+        rad = math.atan2(point02[1] - point01[1], point02[0] - point01[0])
+
+        rad = rad + (math.pi / 2) + (math.pi * index)
+        point_x = int(point01_radius * math.cos(rad)) + point01[0]
+        point_y = int(point01_radius * math.sin(rad)) + point01[1]
+
+        draw_list.append([point_x, point_y])
+
+        point_x = int(point02_radius * math.cos(rad)) + point02[0]
+        point_y = int(point02_radius * math.sin(rad)) + point02[1]
+
+        draw_list.append([point_x, point_y])
+
+    points = np.array((draw_list[0], draw_list[1], draw_list[3], draw_list[2]))
+    cv.fillConvexPoly(image, points=points, color=color)
+
+    return image
+
+if __name__ == '__main__':
+    main()
