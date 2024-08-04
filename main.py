@@ -20,7 +20,7 @@ def main():
     col2.write("Tokyo2020 Pictogram")
     debug_image02_placeholder = col2.empty()
 
-    cap_device = 1
+    cap_device = 2
     cap_width = 640
     cap_height = 360
     static_image_mode = False
