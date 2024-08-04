@@ -9,19 +9,6 @@ import streamlit as st
 from utils import CvFpsCalc
 from PIL import Image
 
-def get_args():
-    """Streamlit 환경에서는 argparse 대신 Streamlit의 sidebar를 사용하여 인자를 받습니다."""
-    device = st.sidebar.selectbox('Device', options=[0, 1], index=0)
-    width = st.sidebar.slider('Width', 320, 1280, 640)
-    height = st.sidebar.slider('Height', 240, 720, 360)
-    static_image_mode = st.sidebar.checkbox('Static Image Mode', value=False)
-    model_complexity = st.sidebar.selectbox('Model Complexity', options=[0, 1, 2], index=1)
-    min_detection_confidence = st.sidebar.slider('Min Detection Confidence', 0.0, 1.0, 0.5)
-    min_tracking_confidence = st.sidebar.slider('Min Tracking Confidence', 0.0, 1.0, 0.5)
-    rev_color = st.sidebar.checkbox('Reverse Color', value=False)
-
-    return (device, width, height, static_image_mode, model_complexity, min_detection_confidence, min_tracking_confidence, rev_color)
-
 def main():
     # 페이지 레이아웃을 'wide'로 설정
     st.set_page_config(layout='wide')
@@ -39,16 +26,22 @@ def main():
     col2.write("Tokyo2020 Pictogram")
     debug_image02_placeholder = col2.empty()
 
-    # 스트림릿 사이드바에서 인자 받기
-    (cap_device, cap_width, cap_height, static_image_mode, model_complexity, 
-    min_detection_confidence, min_tracking_confidence, rev_color) = get_args()
+    # 사용자 정의 설정
+    cap_device = 0
+    cap_width = 640
+    cap_height = 360
+    static_image_mode = False
+    model_complexity = 1
+    min_detection_confidence = 0.5
+    min_tracking_confidence = 0.5
+    rev_color = False
 
-    # 카메라 준비 ###############################################################
+    # 카메라 준비
     cap = cv.VideoCapture(cap_device)
     cap.set(cv.CAP_PROP_FRAME_WIDTH, cap_width)
     cap.set(cv.CAP_PROP_FRAME_HEIGHT, cap_height)
 
-    # 모델 로드 ###############################################################
+    # 모델 로드
     mp_pose = mp.solutions.pose
     pose = mp_pose.Pose(
         static_image_mode=static_image_mode,
@@ -57,10 +50,10 @@ def main():
         min_tracking_confidence=min_tracking_confidence,
     )
 
-    # FPS 계산 모듈 ########################################################
+    # FPS 측정 모듈
     cvFpsCalc = CvFpsCalc(buffer_len=10)
 
-    # 색 지정
+    # 색상 지정
     if rev_color:
         color = (255, 255, 255)
         bg_color = (100, 33, 3)
@@ -68,36 +61,35 @@ def main():
         color = (100, 33, 3)
         bg_color = (255, 255, 255)
 
-    while True:
+    while cap.isOpened():
         display_fps = cvFpsCalc.get()
 
-        # 카메라 캡처 #####################################################
+        # 카메라 캡처
         ret, image = cap.read()
         if not ret:
             break
         image = cv.flip(image, 1)  # 미러 표시
-        image_rgb = cv.cvtColor(image, cv.COLOR_BGR2RGB)  # 색 공간 변경
-        debug_image01 = copy.deepcopy(image_rgb)  # 변경된 색 공간으로 이미지 복사
+        image_rgb = cv.cvtColor(image, cv.COLOR_BGR2RGB)  # 색공간 변경
+        debug_image01 = copy.deepcopy(image_rgb)  # 변경된 색공간으로 이미지 복사
         debug_image02 = np.zeros((image_rgb.shape[0], image_rgb.shape[1], 3), np.uint8)
         cv.rectangle(debug_image02, (0, 0), (image_rgb.shape[1], image_rgb.shape[0]),
-                     bg_color,
-                     thickness=-1)
+                    bg_color,
+                    thickness=-1)
 
-        # 검출 실행 #############################################################
-        image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
-        results = pose.process(image)
+        # 검출 실시
+        results = pose.process(image_rgb)
 
-        # 그리기 ################################################################
+        # 랜드마크 그리기
         if results.pose_landmarks is not None:    
             mp.solutions.drawing_utils.draw_landmarks(
-                debug_image01, results.pose_landmarks, mp_pose.POSE_CONNECTIONS,
-                mp.solutions.drawing_utils.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2),  # 관절의 점 스타일 설정
-                mp.solutions.drawing_utils.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2)   # 관절을 잇는 선 스타일 설정
+                    debug_image01, results.pose_landmarks, mp_pose.POSE_CONNECTIONS,
+                    mp.solutions.drawing_utils.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2),  # 관절의 점 스타일 설정
+                    mp.solutions.drawing_utils.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2)   # 관절을 잇는 선 스타일 설정
             )
             # 색상 순서를 RGB로 변경
             color_rgb = (color[2], color[1], color[0])
             bg_color_rgb = (bg_color[2], bg_color[1], bg_color[0])
-            # 그리기
+            # 랜드마크 그리기
             debug_image02 = draw_stick_figure(
                 debug_image02,
                 results.pose_landmarks,
@@ -110,7 +102,6 @@ def main():
         cv.putText(debug_image02, "FPS:" + str(display_fps), (10, 30),
                    cv.FONT_HERSHEY_SIMPLEX, 1.0, color, 2, cv.LINE_AA)
 
-        # 화면 반영 #############################################################
         # 이미지를 PIL 형식으로 변환
         debug_image01_pil = Image.fromarray(debug_image01)
         debug_image02_pil = Image.fromarray(debug_image02)
@@ -119,8 +110,8 @@ def main():
         debug_image01_placeholder.image(debug_image01_pil, use_column_width=True)
         debug_image02_placeholder.image(debug_image02_pil, use_column_width=True)
 
-        # 스트림릿에서 멈춤을 위한 종료 조건 설정
-        if st.button('Stop'):
+        # ESC 키로 종료
+        if st.button("Stop"):
             break
 
     cap.release()
@@ -143,7 +134,7 @@ def draw_stick_figure(
         landmark_point.append(
             [index, landmark.visibility, (landmark_x, landmark_y), landmark_z])
 
-    # 다리의 위치를 허리의 중점으로 수정
+    # 다리의 위치를 허리의 중간점으로 수정
     right_leg = landmark_point[23]
     left_leg = landmark_point[24]
     leg_x = int((right_leg[2][0] + left_leg[2][0]) / 2)
@@ -152,7 +143,7 @@ def draw_stick_figure(
     landmark_point[23][2] = (leg_x, leg_y)
     landmark_point[24][2] = (leg_x, leg_y)
 
-    # 거리 순으로 정렬
+    # 거리순으로 정렬
     sorted_landmark_point = sorted(landmark_point,
                                    reverse=True,
                                    key=lambda x: x[3])
@@ -168,7 +159,7 @@ def draw_stick_figure(
     stick_radius02 = int(stick_radius01 * (3 / 4))
     stick_radius03 = int(stick_radius02 * (3 / 4))
 
-    # 그리기 대상 리스트
+    # 그릴 대상 리스트
     draw_list = [
         11,  # 오른팔
         12,  # 왼팔
@@ -216,6 +207,7 @@ def draw_stick_figure(
 
     return image
 
+
 def min_enclosing_face_circle(landmark_point):
     landmark_array = np.empty((0, 2), int)
 
@@ -230,6 +222,7 @@ def min_enclosing_face_circle(landmark_point):
     center, radius = cv.minEnclosingCircle(points=landmark_array)
 
     return center, radius
+
 
 def draw_stick(
         image,
@@ -262,6 +255,7 @@ def draw_stick(
     cv.fillConvexPoly(image, points=points, color=color)
 
     return image
+
 
 if __name__ == '__main__':
     main()
