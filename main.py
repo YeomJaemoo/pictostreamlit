@@ -20,7 +20,7 @@ def main():
     col2.write("Tokyo2020 Pictogram")
     debug_image02_placeholder = col2.empty()
 
-    cap_device = 2
+    cap_device = 0
     cap_width = 640
     cap_height = 360
     static_image_mode = False
@@ -29,7 +29,12 @@ def main():
     min_tracking_confidence = 0.5
     rev_color = False
 
+    # 카메라 비활성화
     cap = cv.VideoCapture(cap_device)
+    if not cap.isOpened():
+        st.error("카메라를 열 수 없습니다. 다른 장치나 환경에서 실행 중일 수 있습니다.")
+        return
+
     cap.set(cv.CAP_PROP_FRAME_WIDTH, cap_width)
     cap.set(cv.CAP_PROP_FRAME_HEIGHT, cap_height)
 
